@@ -2,18 +2,25 @@
 
 'use strict'
 
+require('dotenv').config()
+
+const promptly = require('promptly')
 const minimist = require('minimist')
 const { createDb } = require('./lib')
 const argv = minimist(process.argv.slice(2))
 
+const promptPassword = () =>
+  promptly.password('Enter your password', { replace: '*' })
+
 async function main () {
-  const db = await createDb('postgres')
+  const db = await createDb(process.env.DB_TYPE)
   const command = argv._.shift()
 
   switch (command) {
     case 'users:create':
       try {
-        const { user, pass } = argv
+        const { user } = argv
+        const pass = await promptPassword()
         await db.createUser(user, pass)
 
         console.log(`${user} created`)
@@ -37,15 +44,24 @@ async function main () {
     case 'secrets:create':
       try {
         const { user, name, value } = argv
-        await db.createSecret(user, name, value)
+        const pass = await promptPassword()
+        const isAuth = await db.authenticate(user, pass)
+        if (!isAuth) throw new Error('Invalid user or password')
+
+        await db.createSecret(user, pass, name, value)
         console.log(`secret: ${name} created`)
       } catch (err) {
+        console.log(err)
         throw new Error('Cannot create secret')
       }
       break
     case 'secrets:list':
       try {
         const { user } = argv
+        const pass = await promptPassword()
+        const isAuth = await db.authenticate(user, pass)
+        if (!isAuth) throw new Error('Invalid user or password')
+
         const secrets = await db.listSecrets(user)
         secrets.forEach(secret => {
           console.log(`- ${secret.name}`)
@@ -57,16 +73,25 @@ async function main () {
     case 'secrets:get':
       try {
         const { user, name } = argv
-        const secret = await db.getSecret(user, name)
+        const pass = await promptPassword()
+        const isAuth = await db.authenticate(user, pass)
+        if (!isAuth) throw new Error('Invalid user or password')
+
+        const secret = await db.getSecret(user, pass, name)
         if (!secret) return console.log(`secret ${name} not found`)
         console.log(`- ${secret.name} = ${secret.value}`)
       } catch (err) {
+        console.log(err)
         throw new Error('Cannot get secret')
       }
       break
     case 'secrets:update':
       try {
         const { user, name, value } = argv
+        const pass = await promptPassword()
+        const isAuth = await db.authenticate(user, pass)
+        if (!isAuth) throw new Error('Invalid user or password')
+
         await db.updateSecret(user, name, value)
         console.log(`secret ${name} updated`)
       } catch (err) {
@@ -76,6 +101,10 @@ async function main () {
     case 'secrets:delete':
       try {
         const { user, name } = argv
+        const pass = await promptPassword()
+        const isAuth = await db.authenticate(user, pass)
+        if (!isAuth) throw new Error('Invalid user or password')
+
         await db.deleteSecret(user, name)
         console.log(`secret ${name} deleted`)
       } catch (err) {
