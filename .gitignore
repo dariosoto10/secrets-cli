@@ -1,3 +1,4 @@
 node_modules/
 secrets.db
+secrets_dev.db
 .env
